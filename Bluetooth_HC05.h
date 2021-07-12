@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <SoftwareSerial.h>
 
 enum
 {
@@ -117,7 +118,7 @@ enum HC05_Result
 class Bluetooth_HC05: public Print
 {
 public:
-  Bluetooth_HC05(HardwareSerial &serial = Serial);
+  Bluetooth_HC05(SoftwareSerial &serial);
   ~Bluetooth_HC05();
 
   void begin(unsigned baud_rate = 38400, uint8_t reset_pin = 0xFF,
@@ -206,7 +207,7 @@ public:
   HC05_Result getLastError() const;
 
 private:
-  HardwareSerial *m_uart;
+  SoftwareSerial *m_uart;
   unsigned long m_timeout;
   unsigned long m_ticksAtStart;
 
@@ -225,6 +226,7 @@ private:
   size_t readLine(char *buffer, size_t buffer_size);
   char *readResponseWithPrefix(char *buffer, size_t buffer_size, const char *prefix);
   static char *skipPrefix(char *str, size_t str_length, const char *prefix);
+  char Bluetooth_HC05::skipGarbage(char *str, size_t str_length, char delim);
 
   void startOperation(unsigned long timeout);
   bool isOperationTimedOut() const;

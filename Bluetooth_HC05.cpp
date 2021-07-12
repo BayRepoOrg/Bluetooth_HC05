@@ -64,7 +64,7 @@ unsigned long htoul(const char *str)
 }
 
 
-Bluetooth_HC05::Bluetooth_HC05(HardwareSerial &serial):
+Bluetooth_HC05::Bluetooth_HC05(SoftwareSerial &serial):
   m_uart(&serial), m_timeout(HC05_DEFAULT_TIMEOUT), m_ticksAtStart(millis()),
   m_modePin(0xFF), m_resetPin(0xFF), m_errorCode(HC05_OK)
 {
@@ -950,6 +950,7 @@ bool Bluetooth_HC05::initSerialPortProfile(unsigned long timeout)
 
 bool Bluetooth_HC05::inquire(InquiryCallback callback, unsigned long timeout)
 {
+  char ch;
   startOperation(timeout);
 
   PGM_STRING_MAPPED_TO_RAM(command, "INQ");
@@ -957,13 +958,17 @@ bool Bluetooth_HC05::inquire(InquiryCallback callback, unsigned long timeout)
 
   while (!isOperationTimedOut())
   {
-    if (m_uart->peek() != '+')
+	while(!m_uart->available());
+	ch = m_uart->peek();
+    if (ch != '+') {
       break;
+	}
 
-    char response[HC05_ADDRESS_BUFSIZE + 10];
+    char response[HC05_ADDRESS_BUFSIZE + 20];
     PGM_STRING_MAPPED_TO_RAM(response_pattern, "+INQ:");
     const char *address_part;
     address_part = readResponseWithPrefix(response, sizeof(response), response_pattern);
+	skipGarbage(address_part, sizeof(response), ',');
 
     BluetoothAddress address;
     parseBluetoothAddress(address, address_part, ':');
@@ -990,9 +995,9 @@ bool Bluetooth_HC05::pair(const BluetoothAddress &address, unsigned long timeout
 
   PGM_STRING_MAPPED_TO_RAM(format, ",%lu");
   snprintf(params_str + address_length,
-    sizeof(params_str) - address_length, format, timeout);
+    sizeof(params_str) - address_length, format, (unsigned long)(timeout / 1000));
 
-  PGM_STRING_MAPPED_TO_RAM(command, "PAIR");
+  PGM_STRING_MAPPED_TO_RAM(command, "PAIR=");
   return simpleCommand(command, params_str, timeout);
 }
 
@@ -1234,6 +1239,7 @@ char *Bluetooth_HC05::readResponseWithPrefix(
     return 0;
 
   size_t response_length = readLine(buffer, buffer_size);
+  
   char *postfix = skipPrefix(buffer, response_length, prefix);
 
   if (!postfix)
@@ -1241,7 +1247,6 @@ char *Bluetooth_HC05::readResponseWithPrefix(
 
   return postfix;
 }
-
 
 char *Bluetooth_HC05::skipPrefix(char *str, size_t str_length, const char *prefix)
 {
@@ -1256,6 +1261,16 @@ char *Bluetooth_HC05::skipPrefix(char *str, size_t str_length, const char *prefi
   return 0;
 }
 
+char Bluetooth_HC05::skipGarbage(char *str, size_t str_length, char delim){
+  if (!str || str_length == 0)
+    return 0;
+  while(str_length--){
+	  if (str[str_length]==delim) str[str_length]=0;
+  }
+  return 1;
+	
+}
+
 
 void Bluetooth_HC05::startOperation(unsigned long timeout)
 {
@@ -1267,7 +1282,8 @@ void Bluetooth_HC05::startOperation(unsigned long timeout)
 
 bool Bluetooth_HC05::isOperationTimedOut() const
 {
-  return operationDuration() >= m_timeout;
+  unsigned long tmp = operationDuration();
+  return tmp >= m_timeout;
 }
 
 
